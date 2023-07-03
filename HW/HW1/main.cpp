@@ -61,7 +61,7 @@ Eigen::Matrix4f get_rotation(Vector3f axis, float angle)
     return rotation;
 }
 
-Eigen::Matrix4f get_projection_matrix2(float eye_fov, float aspect_ratio,
+Eigen::Matrix4f get_projection_matrix0(float eye_fov, float aspect_ratio,
     float zNear, float zFar)
 {
     // Students will implement this function
@@ -91,14 +91,12 @@ Eigen::Matrix4f get_projection_matrix2(float eye_fov, float aspect_ratio,
 
     return projection;
 }
-Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
+Eigen::Matrix4f get_projection_matrix1(float eye_fov, float aspect_ratio, float zNear, float zFar)
 {
     Eigen::Matrix4f projection;
 
     // 计算视角范围内的上下左右边界
-    float eye_angle = eye_fov * MY_PI / 180;
-    //float top = tan(eye_angle * 0.5f) * zNear;
-    float top = zNear * tan(eye_angle / 2);
+    float top = tan(eye_fov * 0.5f) * zNear;
     float right = top * aspect_ratio;
     float bottom = -top;
     float left = -right;
@@ -111,7 +109,45 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float z
 
     return projection;
 }
+Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
+    float zNear, float zFar)
+{
+    // Students will implement this function
 
+    Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+
+    float alpha = eye_fov / 180 * MY_PI;
+    float n = -zNear, f = -zFar;
+    float t = tan(alpha / 2) * abs(n), r = t * aspect_ratio;
+    float b = -t, l = -r;
+
+    Eigen::Matrix4f p2o;
+    p2o << n, 0, 0, 0,
+        0, n, 0, 0,
+        0, 0, n + f, -n * f,
+        0, 0, 1, 0;
+
+    Eigen::Matrix4f translation;
+    translation << 1, 0, 0, -(l + r) / 2,
+        0, 1, 0, -(b + t) / 2,
+        0, 0, 1, -(n + f) / 2,
+        0, 0, 0, 1;
+
+    Eigen::Matrix4f zoom;
+    zoom << 2 / (r - l), 0, 0, 0,
+        0, 2 / (t - b), 0, 0,
+        0, 0, 2 / (n - f), 0,
+        0, 0, 0, 1;
+
+    Eigen::Matrix4f o = zoom * translation;
+
+    projection = o * p2o;
+    // TODO: Implement this function
+    // Create the projection matrix for the given parameters.
+    // Then return it.
+
+    return projection;
+}
 int main(int argc, const char** argv)
 {
     float angle = 0;
