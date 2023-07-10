@@ -6,6 +6,7 @@
 #include "Triangle.hpp"
 
 constexpr double MY_PI = 3.1415926;
+
 inline double Degree(double angle)  {return angle*MY_PI/180.0;}
 Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 {
@@ -128,7 +129,9 @@ int main(int argc, const char** argv)
         image.convertTo(image, CV_8UC3, 1.0f);
         cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
         cv::imshow("image", image);
-        cv::imwrite("result.png",image);
+        std::string filename = "result_MSXX_" + std::to_string(MSXX);
+        filename += ".png";
+        cv::imwrite(filename,image);
         key = cv::waitKey(10);
 
         // std::cout << "frame count: " << frame_count++ << '\n';

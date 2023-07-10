@@ -8,6 +8,7 @@
 #include "rasterizer.hpp"
 #include <opencv2/opencv.hpp>
 #include <math.h>
+#include "global.hpp"
 
 
 rst::pos_buf_id rst::rasterizer::load_positions(const std::vector<Eigen::Vector3f> &positions)
@@ -122,7 +123,7 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
         rasterize_triangle(t);
     }
 }
-
+extern int N;
 //Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     auto v = t.toVector4();
@@ -134,67 +135,44 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     float y_min=std::min(std::min(v[0][1], v[1][1]), v[2][1]);
     float y_max=std::max(std::max(v[0][1], v[1][1]), v[2][1]);
 
-    // anti-alising
-    bool MSAA4X=true; 
 
-    // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
-    if(!MSAA4X)
+    int N = MSXX_N;
+    for (int x = (int)x_min; x <= (int)x_max; x++)
     {
-        // without anti-alising
-        for(int x=(int)x_min; x<=(int)x_max; x++)
+        for (int y = (int)y_min; y <= (int)y_max; y++)
         {
-            for(int y=(int)y_min; y<=(int)y_max; y++)
-            {
-                // we need to decide whether this point is actually inside the triangle
-                if(!insideTriangle((float)x,(float)y,t.v))    continue;
-                // get z value--depth
-                // If so, use the following code to get the interpolated z value.
-                auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-                float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-                float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-                z_interpolated *= w_reciprocal;
+            float min_depth = FLT_MAX;
+            int count = 0;
 
-                // compare the current depth with the value in depth buffer
-                if(depth_buf[get_index(x,y)]>z_interpolated)// note: we use get_index to get the index of current point in depth buffer
+            std::vector<std::vector<float>> sampled_points;
+            int sqrtN = sqrt(N);
+            for (int i = 0; i < sqrtN; i++)
+            {
+                for (int j = 0; j < sqrtN; j++)
                 {
-                    // we have to update this pixel
-                    depth_buf[get_index(x,y)]=z_interpolated; // update depth buffer
-                    // assign color to this pixel
-                    set_pixel(Vector3f(x,y,z_interpolated), t.getColor());
+                    float dx = (i + 0.5) / sqrtN;
+                    float dy = (j + 0.5) / sqrtN;
+                    sampled_points.push_back({ dx, dy });
                 }
             }
-        }
-    }
-    else
-    {
-        for(int x=(int)x_min; x<=(int)x_max; x++)
-        {
-            for(int y=(int)y_min; y<=(int)y_max; y++)
+
+            for (int i = 0; i < N; i++)
             {
-                // you have to record the min-depth of the 4 sampled points(in one pixel)
-                float min_depth=FLT_MAX;
-                // the number of the 4 sampled points that are inside triangle
-                int count=0;
-                std::vector<std::vector<float>> sampled_points{{0.25,0.25},{0.25,0.75},{0.75,0.25},{0.75,0.75}};
-                for(int i=0; i<4; i++)
+                if (insideTriangle(float(x) + sampled_points[i][0], float(y) + sampled_points[i][1], t.v))
                 {
-                    if(insideTriangle(float(x)+sampled_points[i][0], float(y)+sampled_points[i][1], t.v))
-                    {
-                        auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-                        float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-                        float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-                        z_interpolated *= w_reciprocal;
-                        min_depth=std::min(min_depth, z_interpolated);
-                        count+=1;
-                    }
+                    auto [alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+                    float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                    float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                    z_interpolated *= w_reciprocal;
+                    min_depth = std::min(min_depth, z_interpolated);
+                    count++;
                 }
-                if(count>0 && depth_buf[get_index(x,y)]>min_depth)
-                {
-                    // update
-                    depth_buf[get_index(x,y)]=min_depth;
-                    // note: the color should be changed too
-                    set_pixel(Vector3f(x,y,min_depth), t.getColor()*count/4.0+frame_buf[get_index(x,y)]*(4-count)/4.0); // frame_buf contains the current color
-                }
+            }
+
+            if (count > 0 && depth_buf[get_index(x, y)] > min_depth)
+            {
+                depth_buf[get_index(x, y)] = min_depth;
+                set_pixel(Vector3f(x, y, min_depth), t.getColor() * count / float(N) + frame_buf[get_index(x, y)] * (N - count) / float(N));
             }
         }
     }
