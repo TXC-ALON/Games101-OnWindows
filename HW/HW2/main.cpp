@@ -6,7 +6,7 @@
 #include "Triangle.hpp"
 
 constexpr double MY_PI = 3.1415926;
-
+inline double Degree(double angle)  {return angle*MY_PI/180.0;}
 Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 {
     Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
@@ -33,17 +33,15 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float z
     // TODO: Copy-paste your implementation from the previous assignment.
     Eigen::Matrix4f projection;
 
-    // 计算视角范围内的上下左右边界
-    float top = tan(eye_fov * 0.5f) * zNear;
-    float right = top * aspect_ratio;
-    float bottom = -top;
-    float left = -right;
+    float n=zNear;
+    float f=zFar;
+    float t=-abs(zNear)*tan(Degree(eye_fov)/2.0); // you do not need to add "-" here, it is just for visualizatin
+    float r=t*aspect_ratio;
 
-    // 构建透视投影矩阵
-    projection << (2.0f * zNear) / (right - left), 0.0f, (right + left) / (right - left), 0.0f,
-        0.0f, (2.0f * zNear) / (top - bottom), (top + bottom) / (top - bottom), 0.0f,
-        0.0f, 0.0f, -(zFar + zNear) / (zFar - zNear), -(2.0f * zFar * zNear) / (zFar - zNear),
-        0.0f, 0.0f, -1.0f, 0.0f;
+    projection << n/r, 0, 0, 0,
+                0, n/t, 0, 0,
+                0, 0, (n+f)/(n-f), -2*n*f/(n-f),
+                0, 0, 1, 0;
 
     return projection;
 }
@@ -60,7 +58,7 @@ int main(int argc, const char** argv)
         filename = std::string(argv[1]);
     }
 
-    rst::rasterizer r(800, 800);
+    rst::rasterizer r(700, 700);
 
     Eigen::Vector3f eye_pos = {0,0,5};
 
@@ -115,7 +113,7 @@ int main(int argc, const char** argv)
 
         return 0;
     }
-
+    
     while(key != 27)
     {
         r.clear(rst::Buffers::Color | rst::Buffers::Depth);
@@ -126,13 +124,14 @@ int main(int argc, const char** argv)
 
         r.draw(pos_id, ind_id, col_id, rst::Primitive::Triangle);
 
-        cv::Mat image(800, 800, CV_32FC3, r.frame_buffer().data());
+        cv::Mat image(700, 700, CV_32FC3, r.frame_buffer().data());
         image.convertTo(image, CV_8UC3, 1.0f);
         cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
         cv::imshow("image", image);
+        cv::imwrite("result.png",image);
         key = cv::waitKey(10);
 
-        std::cout << "frame count: " << frame_count++ << '\n';
+        // std::cout << "frame count: " << frame_count++ << '\n';
     }
 
     return 0;
